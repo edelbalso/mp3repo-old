@@ -1,0 +1,22 @@
+# config/global.yml
+global:
+    clear_screen_on_output: true
+    artist_search_sensitivity: 80   # artists with % matches under this not displayed
+    
+database:
+    
+datastore:
+    AWS:
+        aws_access_key_id: asdfaoishdf
+        aws_scret_access_key: asdfhweoih
+        bucket_name: lfhd
+    FTP:
+        host: IP HERE
+        port: 21
+        username: USERNAME_HERE
+        password: PASSWORD_HERE
+        path: /save_folder # no trailing slash
+
+friends:
+    kevin: http://kevin.com
+    paul: http://paul.com

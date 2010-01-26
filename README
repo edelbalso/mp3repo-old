@@ -1,0 +1,91 @@
+What is it?
+===========
+
+mp3repo.rb is essentially an mp3 backup script for really unbalanced, overly
+neurotic people. The idea is that all your mp3 files should be saved 
+somewhere safe that exists at a remote location accessible via FTP or S3.
+Additionally, no mp3 file should be put in the repository unless it passes
+strict verifications for artist and album names, as well as other id3 tag
+info.
+
+The main goal of this script, above and beyond the id3 tag verification, is
+to allow for the archiving of albums at a remote site so they can be deleted
+locally, freeing up HD space, but not forgotten.       
+           
+Assumptions
+===========
+The script works with the following (reasonable) assumptions:
+
+1)  You're mentally unbalanced enough to not want any "singles" in your music
+	library, instead opting only for full albums. This assumption can be 
+	negotiated.
+
+2)  All your mp3s are stored in one folder, grouped together by artist then 
+	album. File naming conventions are as follows:
+	
+	  /Artist1/Album1/01 - Track Name.mp3
+	 				  02 - Track Name.mp3
+					  ...
+			  /Album2/01 - Track Name.mp3
+					  02 - Track Name.mp3
+	     			  ...
+      /Artist2/Album1/01 - Track Name.mp3
+					  02 - Track Name.mp3
+					  ...
+			  /Album2/01 - Track Name.mp3
+			          02 - Track Name.mp3
+					  ...
+
+3)  You're happy not backing anything up until the Artist name in the folder
+	matches the one in the id3 tag of the individual tracks. Same for Album Name
+	and Track Names/File names.
+	   
+                                                    
+Terminology
+===========
+Repository : 
+	A remote data store that will keep a copy of each individual mp3 file.
+Library :	 
+	A folder on your computer that will contain the mp3 files that are pulled 
+	from the repository. These can be used to listen to.                     
+Staging :
+	A staged file is an mp3 file that has passed filename/id3 checks and can be
+	added to the mp3repo database. Once in the database, the metadata will be 
+	stored and indexed and the file can be copied to the repository at will.
+Committing :
+	To copy a file to the backup site is to "commit the file to the repository".
+
+Workflow
+========
+To achieve our goals, every Album/Artist/Track will follow a sequence of states:
+
+N - Non-Verified: 
+ 	This will be all files that are in the local library that have yet to pass
+	naming verifications and don't exist in the mp3repo database.
+S - Staged:
+	A staged entity is one that has passed naming verifications and has been 
+	added to the local mp3repo database but not yet backed up.
+C - Committed:
+	A committed track is an mp3 file that has been copied and backed up to the 
+	remote server. An album is considered committed when all its tracks have been
+	committed. An artist is committed once all its albums have been committed.
+R - Remote Only:
+	These are all files that have been deleted from the local library but still 
+	exist in the remote repository. 
+	
+Naturally, a healthy music collection will have mostly, if not all, C's and R's.
+	
+Dependencies
+============
+
+The following is a short list of essential ruby gems to be installed for this
+script to work :
+
+http://scrobbler.rubyforge.org/
+sudo gem install scrobbler
+sudo gem install ActiveRecord
+sudo gem install sqlite3
+sudo gem install rbrainz
+sudo gem install Text 
+sudo gem install colorize
+sudo gem install progressbar
