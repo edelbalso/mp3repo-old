@@ -67,11 +67,17 @@ class LocalLibrary
       end
       create_table(:albums) do |t|
         t.column :id, :integer
+        t.column :artist_id, :integer
+        t.column :rbrainz_uuid, :string
         t.column :name, :string
+        t.column :release_type, :string
+        t.column :year, :string
+        t.column :track_count, :integer
         t.column :status, :string
       end
       create_table(:songs) do |t|
         t.column :id, :integer
+        t.column :album_id, :integer
         t.column :name, :string
         t.column :status, :string
       end
@@ -91,11 +97,35 @@ class LocalLibrary
     )
   end
   
+  def add_album(artist, album)
+    #pp album ; exit
+    parsed_type = album[:type][album[:type].rindex('#')+1..album[:type].size]
+
+    @artists[artist][:albums][album[:name]] = {}
+    @artists[artist][:albums][album[:name]][:model] = Album.create(
+      :name => album[:name],
+      :artist_id => @artists[artist][:model][:id],
+      :status => "S",
+      :release_type => parsed_type,
+      :year => album[:year],
+      :track_count => album[:track_count],
+      :rbrainz_uuid => album[:rbrainz_uuid]
+    )
+    pp artists[artist][:albums][album[:name]] ; exit
+  end
+  
   def change_artist(old_name, new_name)
     puts "Changing artist name from " + old_name + " to " + new_name if $verbose
 
     # TODO : do more robust error checking and handling here.
     FileUtils.mv(@library_dir + old_name, @library_dir + new_name)
+  end
+  
+  def change_album(artist, old_name, new_name)
+    puts "Changing album name from " + old_name + " to " + new_name + " for artist " + artist if $verbose
+
+    # TODO : do more robust error checking and handling here.
+    FileUtils.mv(@library_dir + artist + '/' + old_name, @library_dir + artist + '/' + new_name)
   end
   
 private

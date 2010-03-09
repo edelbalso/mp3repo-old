@@ -49,7 +49,7 @@ private
         puts "ie: Model not instantiated for this artist." if $verbose
         exit
       end
-      releases = local.artists[options.artist][:model].musicbrainz_lookup_releases
+      releases = Album.musicbrainz_lookup_releases(local.artists[options.artist][:model])
 
       organized_releases = {}
       
@@ -71,12 +71,21 @@ private
       puts "Internet Album List".colorize(:yellow)
       puts "-------------------"
       organized_releases.each do |type, orls|
-        puts "  " + type + ":"
+        puts
+        puts "  ,..." + type + "...,"
+        #pp local.artists[options.artist][:albums]
         orls.each do |orl|
+          prefix = "    "
+          if local.artists[options.artist][:albums].has_key?(orl[:name])  
+            if local.artists[options.artist][:albums][orl[:name]][:status] != "N"
+              prefix = local.artists[options.artist][:albums][orl[:name]][:status].stat_color + " | "
+            end
+          end
+            
           if orl[:name].size.to_i > 50
-            puts "    " + orl[:year] + " - " + orl[:name] + " " +  "(" + orl[:track_count].to_s + " tracks)"
+            puts prefix + orl[:year] + " - " + orl[:name] + " " +  "(" + orl[:track_count].to_s + " tracks)"
           else
-            puts "    " + orl[:year] + " - " + orl[:name] + " " * (longest + 1 - orl[:name].size.to_i).abs +  "(" + orl[:track_count].to_s + " tracks)"
+            puts prefix + orl[:year] + " - " + orl[:name] + " " * (longest + 1 - orl[:name].size.to_i).abs +  "(" + orl[:track_count].to_s + " tracks)"
           end
         end
       end
@@ -87,14 +96,12 @@ private
       puts "--------------"
 
        local.artists[options.artist][:albums].sort.each { | name, album_data | 
-         puts album_data[:status].stat_color + " | " + name 
+         puts album_data[:status].stat_color + " | " + name if album_data[:status] == "N"
        }
 
       
       puts
-      # jukebox.find_albums_on_internet(options.artist).each { |a|    
-      #   puts a.release_date.year.to_s + ' - ' + a.name + '[' + Text::Levenshtein.distance(a.name,album).to_s + ']' 
-      # }
+
 
     else  #default action
       #pp local.artists; exit;
@@ -118,12 +125,70 @@ private
   
   def add
     local = LocalLibrary.new
+    #pp options; exit
     if options.album
       if options.artist
-        if local.artists[options.artist].status == 'N'
+        if local.artists[options.artist][:status] == 'N'
           puts "ERROR: Artist not in library. Please add artist with -a first."
+        else
+          results = Album.musicbrainz_lookup_releases(local.artists[options.artist][:model])
+          match = ""
+          match_distance = -1
+          results.each do |r|
+            ld = Text::Levenshtein.distance(options.album,r[:name])
+            if match_distance < 0
+              match = r
+              match_distance = ld
+            elsif ld < match_distance
+              match = r
+              match_distance = ld
+            end
+            
+            #puts "local name: " + options.album + ", Result: " + r[:name] + ", [" + Text::Levenshtein.distance(options.album,r[:name]).to_s + "]"
+          end
+          
+          print "Likely album name is '" + match[:name] + "'. Use it? [y] "
+          reply = $stdin.gets
+          
+          if reply.strip.upcase == 'Y' || reply.strip == "" || reply.strip.upcase == "YES" || reply.strip.upcase == "YUP"
+            if options.album != match[:name]
+              local.change_album(options.artist,options.album, match[:name])
+              options.album == match[:name]
+            end
+            local.add_album(options.artist,match)
+              
+          else
+
+            puts 
+            puts "Albums Found".colorize(:yellow)
+            puts "------------"
+            results.each do |r|
+              parsed_type = r[:type][r[:type].rindex('#')+1..r[:type].size]
+              #pp r; exit
+              puts r[:rbrainz_uuid] + " | " + r[:year].to_s + " - " + r[:name] + " (" + r[:track_count].to_s + " tracks, " + parsed_type + ")"
+            end
+            puts
+            puts "Please Choose an Album from Above".colorize(:yellow)
+            puts "---------------------------------"
+            print "Enter uuid: "
+            reply = $stdin.gets
+            
+            results.each do |r|
+
+              if r[:rbrainz_uuid] == reply.strip
+                print "Use album : " + r[:name] + "? [y] "
+                confirmation = $stdin.gets
+                if confirmation.strip.upcase == 'Y' || confirmation.strip == "" || confirmation.strip.upcase == "YES" || confirmation.strip.upcase == "YUP"
+                  puts "DONE"
+                  local.change_album(options.artist,options.album, r[:name])
+                  options.album = r[:name]
+                  local.add_album(options.artist,r)
+                end
+              end
+            end
+          end
+          
         end
-        puts "TODO: Add Album"
       end
 
     elsif options.artist
@@ -178,7 +243,41 @@ private
       
       
       if artists.size > 0
-        puts "TODO : OTHER OPTIONS EXIST"
+        puts "Likely artist match:"
+        puts likely_artist[:uuid] + " | " + likely_artist[:name] + ", " + likely_artist[:release_count].to_s + " releases"
+        puts
+        puts "Others:"
+        artists.each do |rank, a|
+          puts a[:uuid] + " | " + a[:name] + ", " + a[:release_count].to_s + " releases"
+        end
+        
+        puts
+        print "Use likely artist? [y] "
+        reply = $stdin.gets
+        
+        if reply.strip.upcase == 'Y' || reply.strip == "" || reply.strip.upcase == "YES" || reply.strip.upcase == "YUP"
+          local.add_artist(likely_artist)
+        else
+          # TODO : Figure out how to tie artist to rbrainz if name is changed.
+          print "Please enter artist uuid : "
+          reply = $stdin.gets
+
+          artist_choice = ""
+          artists.each do | rank, a |
+            if a[:uuid] == reply.strip
+              artist_choice = a
+            end
+          end
+
+          puts "You chose " + artist_choice[:name]
+          if options.artist != artist_choice[:name]
+            local.change_artist(options.artist,artist_choice[:name])
+            options.artist = artist_choice[:name]
+          end
+          local.add_artist(artist_choice)
+        end
+        
+        
       elsif likely_artist[:name] == options.artist
         
         print "Artist name contains no errors, adding artist to database..." if $verbose
