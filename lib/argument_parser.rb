@@ -5,6 +5,7 @@ require 'ostruct'
 class ArgumentParser
   
   def self.parse(args)
+    
     options = OpenStruct.new
     options.command = :list
     options.artist = false
@@ -75,7 +76,7 @@ class ArgumentParser
     # error check arguments :
     if options.artist
       unless File.directory? Dir.pwd() + '/' + options.artist
-        puts "ERROR: Artist '" + options.artist + "' not found."
+        puts "ERROR: Artist '" + options.artist + "' not found in local filesystem."
         exit
       end
     end
