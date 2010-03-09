@@ -18,7 +18,7 @@ class Artist < ActiveRecord::Base
 
     artist_filter = Webservice::ArtistFilter.new( 
 #      :name => artist  # for exact searches.
-      :query => artist
+      :query => artist.gsub(/[^[:alnum:]| ]/, '')
     )
 
     query  = Webservice::Query.new()
