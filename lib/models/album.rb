@@ -1,5 +1,5 @@
 class Album < ActiveRecord::Base     
-  has_many :songs
+  has_many :tracks
   belongs_to :artist  
   
   def after_initialize
@@ -7,16 +7,6 @@ class Album < ActiveRecord::Base
   end
 
   def self.musicbrainz_lookup_releases(artist)
-
-    # artist_includes = Webservice::ArtistIncludes.new(
-    #   :aliases      => true,
-    #   :releases     => ['Official'],
-    #   :artist_rels  => true,
-    #   :release_rels => true,
-    #   :track_rels   => true,
-    #   :label_rels   => true,
-    #   :url_rels     => true,
-    # )
 
     query = Webservice::Query.new()
     results = query.get_artist_by_id(artist[:rbrainz_uuid], :releases => ['Official'])
@@ -38,10 +28,12 @@ EOF
 
     albums = []
 
+
     results.releases.each do |album|
       query2 = Webservice::Query.new()
       album_result = query2.get_release_by_id(album.id.uuid, :artist => false, :tracks => true, :release_events => true)
 
+      #pp album_result
       #pp album_result.instance_variables.to_a.join('; ') ; exit
       if $verbose
         puts

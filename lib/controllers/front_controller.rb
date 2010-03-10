@@ -37,8 +37,28 @@ private
 
     if options.album
       if options.artist
-        p local.artists[options.artist].albums[options.album]
-      end
+        unless local.artists[options.artist][:albums][options.album][:model]
+          
+          puts                     
+          puts "Please add album to library before listing this album."
+          puts "ie: Model not instantiated for this album." if $verbose
+          exit          
+        end
+        # pp local.artists[options.artist][:albums][options.album] ; exit #[:albums][options.album] ; exit
+        
+        puts "Artist : " + options.artist + "    Album : " + options.album
+        puts "---------".colorize(:yellow) + ( "-" * options.artist.size ).colorize(:yellow) + "    --------".colorize(:yellow) + ("-" * options.album.size).colorize(:yellow)
+        puts
+        
+        tracks = local.artists[options.artist][:albums][options.album][:tracks]
+        
+#        pp tracks ; exit
+        
+        tracks.sort.each do |num, t|
+          puts "  " + t[:status].stat_color + " | " + t[:file] 
+        end
+        puts
+       end
 
     elsif options.artist
       puts "looking up albums for [" + options.artist + "]" if $verbose
@@ -128,66 +148,123 @@ private
     #pp options; exit
     if options.album
       if options.artist
-        if local.artists[options.artist][:status] == 'N'
-          puts "ERROR: Artist not in library. Please add artist with -a first."
-        else
-          results = Album.musicbrainz_lookup_releases(local.artists[options.artist][:model])
-          match = ""
-          match_distance = -1
-          results.each do |r|
-            ld = Text::Levenshtein.distance(options.album,r[:name])
-            if match_distance < 0
-              match = r
-              match_distance = ld
-            elsif ld < match_distance
-              match = r
-              match_distance = ld
+        if options.tracks
+          tracks = Track.musicbrainz_get_tracks(local.artists[options.artist][:albums][options.album][:model][:rbrainz_uuid])
+          index = Track.sort_track_names(local.artists[options.artist][:albums][options.album][:tracks],tracks)
+
+          changes = false
+          index.sort.each do |num, i|
+            filename = i[:file]
+            newfilename = i[:track_number].to_s + " - " + i[:name] + ".mp3"
+            if filename != newfilename
+              changes = true
             end
-            
-            #puts "local name: " + options.album + ", Result: " + r[:name] + ", [" + Text::Levenshtein.distance(options.album,r[:name]).to_s + "]"
           end
           
-          print "Likely album name is '" + match[:name] + "'. Use it? [y] "
-          reply = $stdin.gets
-          
-          if reply.strip.upcase == 'Y' || reply.strip == "" || reply.strip.upcase == "YES" || reply.strip.upcase == "YUP"
-            if options.album != match[:name]
-              local.change_album(options.artist,options.album, match[:name])
-              options.album == match[:name]
+          if changes
+            col1 = 0
+            index.sort.each do |num, i|
+              if i[:file].size > col1
+                col1 = i[:file].size 
+              end
             end
-            local.add_album(options.artist,match)
-              
-          else
 
-            puts 
-            puts "Albums Found".colorize(:yellow)
-            puts "------------"
-            results.each do |r|
-              parsed_type = r[:type][r[:type].rindex('#')+1..r[:type].size]
-              #pp r; exit
-              puts r[:rbrainz_uuid] + " | " + r[:year].to_s + " - " + r[:name] + " (" + r[:track_count].to_s + " tracks, " + parsed_type + ")"
+            puts
+            puts "Local track count : " + local.artists[options.artist][:albums][options.album][:tracks].size.to_s
+            puts
+            puts "%-#{col1+1}s  %s" % ["Original Track Names","MusicBrainz Track Names"]
+            puts ("-" * col1).colorize(:yellow) + "   " + "--------------------------".colorize(:yellow)
+
+            index.sort.each do |num, i|
+              puts "%-#{col1+1}s| %02d - %s.mp3" % [i[:file], i[:track_number].to_s, i[:name]]
             end
             puts
-            puts "Please Choose an Album from Above".colorize(:yellow)
-            puts "---------------------------------"
-            print "Enter uuid: "
+            print "Discrepencies found in filenames. Rename files to above suggestions? [y] "
             reply = $stdin.gets
-            
-            results.each do |r|
+            if reply.strip.upcase == 'Y' || reply.strip == "" || reply.strip.upcase == "YES" || reply.strip.upcase == "YUP"
+              puts 
+              index.sort.each do | num, i|
+                filename = i[:file]
+                newfilename = i[:track_number].to_s + " - " + i[:name] + ".mp3"
+                if filename != newfilename
+                  local.change_track(options.artist, options.album,filename, newfilename, true)
+                end
 
-              if r[:rbrainz_uuid] == reply.strip
-                print "Use album : " + r[:name] + "? [y] "
-                confirmation = $stdin.gets
-                if confirmation.strip.upcase == 'Y' || confirmation.strip == "" || confirmation.strip.upcase == "YES" || confirmation.strip.upcase == "YUP"
-                  puts "DONE"
-                  local.change_album(options.artist,options.album, r[:name])
-                  options.album = r[:name]
-                  local.add_album(options.artist,r)
+              end
+            else
+              puts
+              puts "My apologies, but you will have to rename the files manually."
+              puts
+            end
+          else
+            index.sort.each do |num,i|
+              local.add_track(options.artist,options.album,i)
+            end
+            puts "Files are all properly named and added to library."
+          end
+          
+        else
+          if local.artists[options.artist][:status] == 'N'
+            puts "ERROR: Artist not in library. Please add artist with -a first."
+          else
+            results = Album.musicbrainz_lookup_releases(local.artists[options.artist][:model])
+            match = ""
+            match_distance = -1
+            results.each do |r|
+              ld = Text::Levenshtein.distance(options.album,r[:name])
+              if match_distance < 0
+                match = r
+                match_distance = ld
+              elsif ld < match_distance
+                match = r
+                match_distance = ld
+              end
+            
+              #puts "local name: " + options.album + ", Result: " + r[:name] + ", [" + Text::Levenshtein.distance(options.album,r[:name]).to_s + "]"
+            end
+          
+            print "Likely album name is '" + match[:name] + "'. Use it? [y] "
+            reply = $stdin.gets
+          
+            if reply.strip.upcase == 'Y' || reply.strip == "" || reply.strip.upcase == "YES" || reply.strip.upcase == "YUP"
+              if options.album != match[:name]
+                local.change_album(options.artist,options.album, match[:name])
+                options.album == match[:name]
+              end
+              local.add_album(options.artist,match)
+              
+            else
+
+              puts 
+              puts "Albums Found".colorize(:yellow)
+              puts "------------"
+              results.each do |r|
+                parsed_type = r[:type][r[:type].rindex('#')+1..r[:type].size]
+                #pp r; exit
+                puts r[:rbrainz_uuid] + " | " + r[:year].to_s + " - " + r[:name] + " (" + r[:track_count].to_s + " tracks, " + parsed_type + ")"
+              end
+              puts
+              puts "Please Choose an Album from Above".colorize(:yellow)
+              puts "---------------------------------"
+              print "Enter uuid: "
+              reply = $stdin.gets
+            
+              results.each do |r|
+
+                if r[:rbrainz_uuid] == reply.strip
+                  print "Use album : " + r[:name] + "? [y] "
+                  confirmation = $stdin.gets
+                  if confirmation.strip.upcase == 'Y' || confirmation.strip == "" || confirmation.strip.upcase == "YES" || confirmation.strip.upcase == "YUP"
+                    puts "DONE"
+                    local.change_album(options.artist,options.album, r[:name])
+                    options.album = r[:name]
+                    local.add_album(options.artist,r)
+                  end
                 end
               end
             end
-          end
           
+          end
         end
       end
 
