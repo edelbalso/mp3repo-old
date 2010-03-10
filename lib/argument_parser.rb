@@ -10,6 +10,7 @@ class ArgumentParser
     options.command = :list
     options.artist = false
     options.album = false
+    options.track
 
     OptionParser.new do |opts|
       opts.banner = "Usage: mp3repo.rb [commands] artist[/album]" 
@@ -65,12 +66,24 @@ class ArgumentParser
         exit
       end
       
+      
       options
     end
 
     if args.size > 0
       options.artist = args[0].split('/')[0] if ARGV
       options.album = args[0].split('/')[1]
+      options.tracks = nil
+      
+      if args[0].split('/')[2] != nil
+        options.tracks = Array.new
+        args.each do |a|
+          if File.extname(a.split('/')[2]).upcase == '.MP3'
+            options.tracks << a.split('/')[2]
+          end
+          
+        end
+      end
     end
     
     # error check arguments :
@@ -90,6 +103,7 @@ class ArgumentParser
       end
     end
     
+#    pp options ; exit
     options
     
   end
